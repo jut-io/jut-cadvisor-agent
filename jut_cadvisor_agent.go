@@ -10,16 +10,16 @@
 // - DONE Start sending to raw connector
 // - DONE Add command line arg parsing
 // - DONE Add support for "minimal" metrics
+// - Fill in README.md
+// - make repository public
 // - Create docker hub account, get it built and downloadable there
+// - Write docker integration confluence page.
 // - Add support for fetching logs
 // - Test for filesystem, network iface, stats that don't show up by default
 // - Performance test
 // - Report metrics when the script itself is having problems
 // - change build to not just pull master of all github modules
-// - make repository public
-// - Fill in README.md
-// - do I want to grab non-metrics stuff like configuraton, etc.
-// - do I want to grab container information or just docker
+// - decide whether or not to grab non-metrics stuff like configuraton, etc.
 
 package main
 
@@ -39,20 +39,16 @@ import (
 )
 
 type Config struct {
-        apikey *string
-        cadvisor_url *string
-        datanode *string
-        allow_insecure_ssl *bool
-        full_metrics bool
+        Apikey string
+        CadvisorUrl string
+        Datanode string
+        AllowInsecureSsl bool
+        FullMetrics bool
 }
 
 var config Config
 
 type DataPointList []interface{}
-
-// Things to fetch:
-//   - All docker container info, under docker endpoint:
-//   - All events, under events endpoint:
 
 type DataPointHeader struct {
         Time time.Time `json:"time"`
@@ -88,11 +84,7 @@ type PerFilesystemDataPoint struct {
         Device string `json:"device"`
 }
 
-func (hdr DataPointHeader) CreateDataPoint(name string, value uint64) *DataPoint {
-        return &DataPoint{hdr, name, value}
-}
-
-func addPerDiskDataPoints(hdr *DataPointHeader, perDiskInfos []info.PerDiskStats, statprefix string) DataPointList {
+func addPerDiskDataPoints(hdr *DataPointHeader, perDiskInfos []info.PerDiskStats, statPrefix string) DataPointList {
 
         var dataPoints DataPointList
         var metrics = []string{"Async", "Read", "Sync", "Total", "Write"}
@@ -101,7 +93,7 @@ func addPerDiskDataPoints(hdr *DataPointHeader, perDiskInfos []info.PerDiskStats
                 for _, metric := range metrics {
                         dataPoints = append(dataPoints,
                                 &PerDiskDataPoint{DataPoint{*hdr,
-                                        statprefix + "." + metric,
+                                        statPrefix + "." + metric,
                                         perDiskInfo.Stats[metric]},
                                         perDiskInfo.Major,
                                         perDiskInfo.Minor})
@@ -111,53 +103,53 @@ func addPerDiskDataPoints(hdr *DataPointHeader, perDiskInfos []info.PerDiskStats
         return dataPoints
 }
 
-func addIfaceDataPoints(hdr *DataPointHeader, IfaceStats info.InterfaceStats, statprefix string) DataPointList {
+func addIfaceDataPoints(hdr *DataPointHeader, ifaceStat info.InterfaceStats, statPrefix string) DataPointList {
 
         var dataPoints DataPointList
 
         dataPoints = append(dataPoints,
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".rx_bytes", IfaceStats.RxBytes}, IfaceStats.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".rx_packets", IfaceStats.RxPackets}, IfaceStats.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".rx_errors", IfaceStats.RxErrors}, IfaceStats.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".rx_dropped", IfaceStats.RxDropped}, IfaceStats.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".tx_bytes", IfaceStats.TxBytes}, IfaceStats.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".tx_packets", IfaceStats.TxPackets}, IfaceStats.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".tx_errors", IfaceStats.TxErrors}, IfaceStats.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statprefix + ".tx_dropped", IfaceStats.TxDropped}, IfaceStats.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_bytes", ifaceStat.RxBytes}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_packets", ifaceStat.RxPackets}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_errors", ifaceStat.RxErrors}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_dropped", ifaceStat.RxDropped}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_bytes", ifaceStat.TxBytes}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_packets", ifaceStat.TxPackets}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_errors", ifaceStat.TxErrors}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_dropped", ifaceStat.TxDropped}, ifaceStat.Name},
         )
 
         return dataPoints
 }
 
-func addMemoryDataPoints(hdr *DataPointHeader, MemData info.MemoryStatsMemoryData, statprefix string) DataPointList {
+func addMemoryDataPoints(hdr *DataPointHeader, memData info.MemoryStatsMemoryData, statPrefix string) DataPointList {
 
         var dataPoints DataPointList
 
-        dataPoints = append(dataPoints, &DataPoint{*hdr, statprefix + "." + "pgfault", MemData.Pgfault})
-        dataPoints = append(dataPoints, &DataPoint{*hdr, statprefix + "." + "pgmajfault", MemData.Pgmajfault})
+        dataPoints = append(dataPoints, &DataPoint{*hdr, statPrefix + "." + "pgfault", memData.Pgfault})
+        dataPoints = append(dataPoints, &DataPoint{*hdr, statPrefix + "." + "pgmajfault", memData.Pgmajfault})
 
         return dataPoints
 }
 
-func addFilesystemDataPoints(hdr *DataPointHeader, FsStat info.FsStats, statprefix string) DataPointList {
+func addFilesystemDataPoints(hdr *DataPointHeader, fsStat info.FsStats, statPrefix string) DataPointList {
 
         var dataPoints DataPointList
 
         dataPoints = append(dataPoints,
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".capacity", FsStat.Limit}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".usage", FsStat.Usage}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".available", FsStat.Available}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".reads_completed", FsStat.ReadsCompleted}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".reads_merged", FsStat.ReadsMerged}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".sectors_read", FsStat.SectorsRead}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".read_time", FsStat.ReadTime}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".writes_completed", FsStat.WritesCompleted}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".writes_merged", FsStat.WritesMerged}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".sectors_written", FsStat.SectorsWritten}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".write_time", FsStat.WriteTime}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".io_in_progress", FsStat.IoInProgress}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".io_time", FsStat.IoTime}, FsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statprefix + ".weighted_io_time", FsStat.WeightedIoTime}, FsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".capacity", fsStat.Limit}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".usage", fsStat.Usage}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".available", fsStat.Available}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".reads_completed", fsStat.ReadsCompleted}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".reads_merged", fsStat.ReadsMerged}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".sectors_read", fsStat.SectorsRead}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".read_time", fsStat.ReadTime}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".writes_completed", fsStat.WritesCompleted}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".writes_merged", fsStat.WritesMerged}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".sectors_written", fsStat.SectorsWritten}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".write_time", fsStat.WriteTime}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".io_in_progress", fsStat.IoInProgress}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".io_time", fsStat.IoTime}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".weighted_io_time", fsStat.WeightedIoTime}, fsStat.Device},
         )
 
         return dataPoints
@@ -178,7 +170,7 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
                 &DataPoint{*hdr, "cpu.load_average", uint64(stat.Cpu.LoadAverage)},
         )
 
-        if (config.full_metrics) {
+        if (config.FullMetrics) {
                 for idx, perCpuInfo := range stat.Cpu.Usage.PerCpu {
                         dataPoints = append(dataPoints, &PerCpuDataPoint{DataPoint{*hdr, "cpu.usage.per-cpu", perCpuInfo}, uint(idx)})
                 }
@@ -198,22 +190,22 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
                 &DataPoint{*hdr, "memory.working_set", stat.Memory.WorkingSet},
         )
 
-        if (config.full_metrics) {
+        if (config.FullMetrics) {
                 dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.ContainerData, "memory.container_data")...)
-                dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.ContainerData, "memory.heirarchical_data")...)
+                dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.HierarchicalData, "memory.hierarchical_data")...)
         }
 
         dataPoints = append(dataPoints, addIfaceDataPoints(hdr, stat.Network.InterfaceStats, "stat.network")...)
 
-        if (config.full_metrics) {
-                for _, IfaceStats := range stat.Network.Interfaces {
-                        dataPoints = append(dataPoints, addIfaceDataPoints(hdr, IfaceStats, "stat.network")...)
+        if (config.FullMetrics) {
+                for _, ifaceStat := range stat.Network.Interfaces {
+                        dataPoints = append(dataPoints, addIfaceDataPoints(hdr, ifaceStat, "stat.network")...)
                 }
         }
 
-        if (config.full_metrics) {
-                for _, FsStat := range stat.Filesystem {
-                        dataPoints = append(dataPoints, addFilesystemDataPoints(hdr, FsStat, "stat.fs")...)
+        if (config.FullMetrics) {
+                for _, fsStat := range stat.Filesystem {
+                        dataPoints = append(dataPoints, addFilesystemDataPoints(hdr, fsStat, "stat.fs")...)
                 }
 
                 dataPoints = append(dataPoints,
@@ -228,13 +220,13 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
 }
 
 
-func collect_metrics(cURL *url.URL, dnURL *url.URL) {
+func collectMetrics(cURL *url.URL, dnURL *url.URL) {
 
         glog.Info("Collecting Metrics")
 
-        staticClient, err := client.NewClient(cURL.String())
+        cAdvisorClient, err := client.NewClient(cURL.String())
         if err != nil {
-                glog.Errorf("tried to make client and got error: %v", err);
+                glog.Errorf("tried to make cAdvisor client and got error: %v", err);
                 return
         }
 
@@ -242,7 +234,7 @@ func collect_metrics(cURL *url.URL, dnURL *url.URL) {
                 NumStats: 1,
         }
 
-        cInfos, err := staticClient.AllDockerContainers(request)
+        cInfos, err := cAdvisorClient.AllDockerContainers(request)
 
         if err != nil {
                 glog.Errorf("unable to get info on all docker containers: %v", err)
@@ -254,24 +246,24 @@ func collect_metrics(cURL *url.URL, dnURL *url.URL) {
         for _, info := range cInfos {
                 dataPoints = append(dataPoints, allDataPoints(info)...)
         }
-        str, err := json.Marshal(dataPoints)
+        jsonDataPoints, err := json.Marshal(dataPoints)
 
         if err != nil {
                 glog.Errorf("Unable to construct JSON metrics: %v", err)
                 return
         }
 
-        glog.V(3).Infof("About to send metrics: %v", string(str))
+        glog.V(3).Infof("About to send metrics: %v", string(jsonDataPoints))
 
         tr := &http.Transport{
-                TLSClientConfig: &tls.Config{InsecureSkipVerify: *config.allow_insecure_ssl},
+                TLSClientConfig: &tls.Config{InsecureSkipVerify: config.AllowInsecureSsl},
         }
 
-        client := &http.Client{Transport: tr}
+        dataNodeClient := &http.Client{Transport: tr}
 
-        resp, err := client.Post(dnURL.String(),
+        resp, err := dataNodeClient.Post(dnURL.String(),
                 "application/json",
-                bytes.NewBuffer(str))
+                bytes.NewBuffer(jsonDataPoints))
 
         if err != nil {
                 glog.Errorf("Unable to send metrics to Jut Data Node: %v", err)
@@ -285,8 +277,8 @@ func collect_metrics(cURL *url.URL, dnURL *url.URL) {
         }
 }
 
-func checkNonEmpty(arg *string, argName string) {
-        if *arg == "" {
+func checkNonEmpty(arg string, argName string) {
+        if arg == "" {
                 os.Stderr.WriteString("Argument " + argName + " must be provided. Usage:\n")
                 flag.PrintDefaults();
                 os.Exit(1)
@@ -296,34 +288,34 @@ func checkNonEmpty(arg *string, argName string) {
 
 func main() {
 
-        config.apikey = flag.String("apikey", "", "Jut Data Engine API Key")
-        config.cadvisor_url = flag.String("cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
-        config.datanode = flag.String("datanode", "", "Jut Data Node Hostname")
-        config.allow_insecure_ssl = flag.Bool("allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
-        config.full_metrics = *flag.Bool("full_metrics", false, "Collect full set of metrics from containers")
+        flag.StringVar(&config.Apikey, "apikey", "", "Jut Data Engine API Key")
+        flag.StringVar(&config.CadvisorUrl, "cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
+        flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")
+        flag.BoolVar(&config.AllowInsecureSsl, "allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
+        flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect full set of metrics from containers")
 
         flag.Parse()
 
-        checkNonEmpty(config.apikey, "apikey")
-        checkNonEmpty(config.cadvisor_url, "cadvisor_url")
-        checkNonEmpty(config.datanode, "datanode")
+        checkNonEmpty(config.Apikey, "apikey")
+        checkNonEmpty(config.CadvisorUrl, "cadvisor_url")
+        checkNonEmpty(config.Datanode, "datanode")
 
-        cURL, err := url.Parse(*config.cadvisor_url)
+        cURL, err := url.Parse(config.CadvisorUrl)
 
         if err != nil {
                 glog.Fatal(err)
         }
 
-        datanode_url := "https://" + *config.datanode + ":3110/api/v1/import/docker?apikey=" + *config.apikey + "&data_source=docker"
-        glog.V(2).Info("URL " + datanode_url)
-        dnURL, err := url.Parse(datanode_url)
+        urlstr := "https://" + config.Datanode + ":3110/api/v1/import/docker?apikey=" + config.Apikey + "&data_source=docker";
+        glog.V(2).Info("Full data node url: " + urlstr)
+        dnURL, err := url.Parse(urlstr)
 
         if err != nil {
                 glog.Fatal(err)
         }
 
         for true {
-                collect_metrics(cURL, dnURL)
+                collectMetrics(cURL, dnURL)
                 time.Sleep(30 * time.Second)
         }
 }
