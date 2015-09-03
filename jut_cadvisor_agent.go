@@ -1,29 +1,40 @@
+// Copyright (c) 2015 Jut, Inc. <www.jut.io>
+//
 // Program to poll from a cadvisor instance, transform those metrics
 // to a form suitable for ingest by a Jut data node, and send them to
 // the jut data node.
 
 // TODO:
-//  Choose between these options:
-//    - http fetch of json + untyped parsing + flattening of stats section
-//    - google client fetch of json + typed parsing + flattening of stats section
-//    - google client fetch of json + typed parsing + typed conversion to our metrics
-//      Q: for these, how do I fetch just 1 stat? !: do a POST instead of a get, with an application/json body like: {"num_stats":1,"start":"0001-01-01T00:00:00Z","end":"0001-01-01T00:00:00Z"}
-//  events fetch
-//  do I want to grab non-metrics stuff like configuraton, etc.
-//  do I want to grab container information or just docker
+// - DONE Find a place to check it in
+// - DONE Make sure I have the go code organized properly
+// - DONE Start sending to raw connector
+// - Add command line arg parsing
+// - Create docker hub account, get it built and downloadable there
+// - Add support for fetching logs
+// - Add support for "minimal" metrics
+// - Test for filesystem, network iface, stats that don't show up by default
+// - Performance test
+// - Report metrics when the script itself is having problems
+// - change build to not just pull master of all github modules
+// - make repository public
+// - Fill in README.md
+// - events fetch
+// - do I want to grab non-metrics stuff like configuraton, etc.
+// - do I want to grab container information or just docker
 
 package main
 
 import (
-	"flag"
-        //        "fmt"
+        "os"
+        "flag"
         "time"
         "bytes"
         "net/http"
+        "net/url"
         "encoding/json"
         "crypto/tls"
 
-	log "github.com/Sirupsen/logrus"
+        "github.com/golang/glog"
         "github.com/google/cadvisor/client"
         info "github.com/google/cadvisor/info/v1"
 )
@@ -198,15 +209,13 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
 }
 
 
-func collect_metrics(apikey string) {
+func collect_metrics(cURL *url.URL, dnURL *url.URL) {
 
-	log.Info("Collecting Metrics");
-	
-        staticClient, err := client.NewClient("http://localhost:8080")
+        glog.Info("Collecting Metrics")
+
+        staticClient, err := client.NewClient(cURL.String())
         if err != nil {
-                log.WithFields(log.Fields{
-			"err": err,
-		}).Error("tried to make client and got error");
+                glog.Errorf("tried to make client and got error: %v", err);
                 return
         }
 
@@ -217,9 +226,7 @@ func collect_metrics(apikey string) {
         cInfos, err := staticClient.AllDockerContainers(request)
 
         if err != nil {
-                log.WithFields(log.Fields{
-			"err": err,
-		}).Error("unable to get info on all docker containers")
+                glog.Errorf("unable to get info on all docker containers: %v", err)
                 return
         }
 
@@ -231,15 +238,11 @@ func collect_metrics(apikey string) {
         str, err := json.Marshal(dataPoints)
 
         if err != nil {
-                log.WithFields(log.Fields{
-			"err": err,
-		}).Error("Unable to construct JSON metrics")
+                glog.Errorf("Unable to construct JSON metrics: %v", err)
                 return
         }
 
-        log.WithFields(log.Fields{
-		"metrics": str,
-	}).Debug("About to send metrics")
+        glog.V(2).Infof("About to send metrics: %v", string(str))
 
         tr := &http.Transport{
                 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -247,33 +250,57 @@ func collect_metrics(apikey string) {
 
         client := &http.Client{Transport: tr}
 
-        resp, err := client.Post("https://127.0.0.1:3110/api/v1/import/docker?apikey=" + apikey + "&data_source=docker",
+        resp, err := client.Post(dnURL.String(),
                 "application/json",
                 bytes.NewBuffer(str))
 
         if err != nil {
-                log.WithFields(log.Fields{
-			"err": err,
-		}).Error("Unable to send metrics to Jut Data Node")
+                glog.Errorf("Unable to send metrics to Jut Data Node: %v", err)
                 return
         }
         defer resp.Body.Close()
 
         if resp.StatusCode != 200 {
-                log.WithFields(log.Fields{
-			"err": resp.Status,
-		}).Error("Unable to send metrics to Jut Data Node: %v")
+                glog.Errorf("Unable to send metrics to Jut Data Node: %v", resp.Status)
                 return
         }
 }
 
+func checkNonEmpty(arg *string, argName string) {
+        if *arg == "" {
+                os.Stderr.WriteString("Argument " + argName + " must be provided. Usage:\n")
+                flag.PrintDefaults();
+                os.Exit(1)
+        }
+}
+
+
 func main() {
 
-	var apikey = flag.String("apikey", "", "Jut Data Engine API Key")
-	flag.Parse();
-	
-	for true {
-		collect_metrics(*apikey)
-		time.Sleep(30 * time.Second)
-	}
+        var apikey = flag.String("apikey", "", "Jut Data Engine API Key")
+        var cadvisor_url = flag.String("cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
+        var datanode_url = flag.String("datanode_url", "", "Jut Data Node Root URL")
+
+        flag.Parse()
+
+        checkNonEmpty(apikey, "apikey")
+        checkNonEmpty(cadvisor_url, "cadvisor_url")
+        checkNonEmpty(datanode_url, "datanode_url")
+
+        cURL, err := url.Parse(*cadvisor_url)
+
+        if err != nil {
+                glog.Fatal(err)
+        }
+
+        dnURL, err := url.Parse(*datanode_url + "/api/v1/import/docker?apikey=" + *apikey + "&data_source=docker")
+
+        if err != nil {
+                glog.Fatal(err)
+        }
+
+        for true {
+                collect_metrics(cURL, dnURL)
+                time.Sleep(30 * time.Second)
+        }
 }
