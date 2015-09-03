@@ -8,17 +8,16 @@
 // - DONE Find a place to check it in
 // - DONE Make sure I have the go code organized properly
 // - DONE Start sending to raw connector
-// - Add command line arg parsing
+// - DONE Add command line arg parsing
+// - DONE Add support for "minimal" metrics
 // - Create docker hub account, get it built and downloadable there
 // - Add support for fetching logs
-// - Add support for "minimal" metrics
 // - Test for filesystem, network iface, stats that don't show up by default
 // - Performance test
 // - Report metrics when the script itself is having problems
 // - change build to not just pull master of all github modules
 // - make repository public
 // - Fill in README.md
-// - events fetch
 // - do I want to grab non-metrics stuff like configuraton, etc.
 // - do I want to grab container information or just docker
 
@@ -38,6 +37,16 @@ import (
         "github.com/google/cadvisor/client"
         info "github.com/google/cadvisor/info/v1"
 )
+
+type Config struct {
+        apikey *string
+        cadvisor_url *string
+        datanode *string
+        allow_insecure_ssl *bool
+        full_metrics bool
+}
+
+var config Config
 
 type DataPointList []interface{}
 
@@ -168,43 +177,53 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
                 &DataPoint{*hdr, "cpu.usage.system", stat.Cpu.Usage.System},
                 &DataPoint{*hdr, "cpu.load_average", uint64(stat.Cpu.LoadAverage)},
         )
-        for idx, perCpuInfo := range stat.Cpu.Usage.PerCpu {
-                dataPoints = append(dataPoints, &PerCpuDataPoint{DataPoint{*hdr, "cpu.usage.per-cpu", perCpuInfo}, uint(idx)})
-        }
 
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoServiceBytes, "diskio.io_service_bytes")...)
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoServiced, "diskio.io_serviced")...)
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoQueued, "diskio.io_queued")...)
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.Sectors, "diskio.sectors")...)
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoServiceTime, "diskio.io_service_time")...)
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoWaitTime, "diskio.io_wait_time")...)
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoMerged, "diskio.io_merged")...)
-        dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoTime, "diskio.io_time")...)
+        if (config.full_metrics) {
+                for idx, perCpuInfo := range stat.Cpu.Usage.PerCpu {
+                        dataPoints = append(dataPoints, &PerCpuDataPoint{DataPoint{*hdr, "cpu.usage.per-cpu", perCpuInfo}, uint(idx)})
+                }
+
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoServiceBytes, "diskio.io_service_bytes")...)
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoServiced, "diskio.io_serviced")...)
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoQueued, "diskio.io_queued")...)
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.Sectors, "diskio.sectors")...)
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoServiceTime, "diskio.io_service_time")...)
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoWaitTime, "diskio.io_wait_time")...)
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoMerged, "diskio.io_merged")...)
+                dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoTime, "diskio.io_time")...)
+        }
 
         dataPoints = append(dataPoints,
                 &DataPoint{*hdr, "memory.usage", stat.Memory.Usage},
                 &DataPoint{*hdr, "memory.working_set", stat.Memory.WorkingSet},
         )
 
-        dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.ContainerData, "memory.container_data")...)
-        dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.ContainerData, "memory.heirarchical_data")...)
+        if (config.full_metrics) {
+                dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.ContainerData, "memory.container_data")...)
+                dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.ContainerData, "memory.heirarchical_data")...)
+        }
 
         dataPoints = append(dataPoints, addIfaceDataPoints(hdr, stat.Network.InterfaceStats, "stat.network")...)
-        for _, IfaceStats := range stat.Network.Interfaces {
-                dataPoints = append(dataPoints, addIfaceDataPoints(hdr, IfaceStats, "stat.network")...)
+
+        if (config.full_metrics) {
+                for _, IfaceStats := range stat.Network.Interfaces {
+                        dataPoints = append(dataPoints, addIfaceDataPoints(hdr, IfaceStats, "stat.network")...)
+                }
         }
 
-        for _, FsStat := range stat.Filesystem {
-                dataPoints = append(dataPoints, addFilesystemDataPoints(hdr, FsStat, "stat.fs")...)
-        }
+        if (config.full_metrics) {
+                for _, FsStat := range stat.Filesystem {
+                        dataPoints = append(dataPoints, addFilesystemDataPoints(hdr, FsStat, "stat.fs")...)
+                }
 
-        dataPoints = append(dataPoints,
-                &DataPoint{*hdr, "task.nr_sleeping", stat.TaskStats.NrSleeping},
-                &DataPoint{*hdr, "task.nr_running", stat.TaskStats.NrRunning},
-                &DataPoint{*hdr, "task.nr_stopped", stat.TaskStats.NrStopped},
-                &DataPoint{*hdr, "task.nr_uninterruptible", stat.TaskStats.NrUninterruptible},
-                &DataPoint{*hdr, "task.nr_io_wait", stat.TaskStats.NrIoWait},
-        )
+                dataPoints = append(dataPoints,
+                        &DataPoint{*hdr, "task.nr_sleeping", stat.TaskStats.NrSleeping},
+                        &DataPoint{*hdr, "task.nr_running", stat.TaskStats.NrRunning},
+                        &DataPoint{*hdr, "task.nr_stopped", stat.TaskStats.NrStopped},
+                        &DataPoint{*hdr, "task.nr_uninterruptible", stat.TaskStats.NrUninterruptible},
+                        &DataPoint{*hdr, "task.nr_io_wait", stat.TaskStats.NrIoWait},
+                )
+        }
         return dataPoints
 }
 
@@ -242,10 +261,10 @@ func collect_metrics(cURL *url.URL, dnURL *url.URL) {
                 return
         }
 
-        glog.V(2).Infof("About to send metrics: %v", string(str))
+        glog.V(3).Infof("About to send metrics: %v", string(str))
 
         tr := &http.Transport{
-                TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+                TLSClientConfig: &tls.Config{InsecureSkipVerify: *config.allow_insecure_ssl},
         }
 
         client := &http.Client{Transport: tr}
@@ -277,23 +296,27 @@ func checkNonEmpty(arg *string, argName string) {
 
 func main() {
 
-        var apikey = flag.String("apikey", "", "Jut Data Engine API Key")
-        var cadvisor_url = flag.String("cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
-        var datanode_url = flag.String("datanode_url", "", "Jut Data Node Root URL")
+        config.apikey = flag.String("apikey", "", "Jut Data Engine API Key")
+        config.cadvisor_url = flag.String("cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
+        config.datanode = flag.String("datanode", "", "Jut Data Node Hostname")
+        config.allow_insecure_ssl = flag.Bool("allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
+        config.full_metrics = *flag.Bool("full_metrics", false, "Collect full set of metrics from containers")
 
         flag.Parse()
 
-        checkNonEmpty(apikey, "apikey")
-        checkNonEmpty(cadvisor_url, "cadvisor_url")
-        checkNonEmpty(datanode_url, "datanode_url")
+        checkNonEmpty(config.apikey, "apikey")
+        checkNonEmpty(config.cadvisor_url, "cadvisor_url")
+        checkNonEmpty(config.datanode, "datanode")
 
-        cURL, err := url.Parse(*cadvisor_url)
+        cURL, err := url.Parse(*config.cadvisor_url)
 
         if err != nil {
                 glog.Fatal(err)
         }
 
-        dnURL, err := url.Parse(*datanode_url + "/api/v1/import/docker?apikey=" + *apikey + "&data_source=docker")
+        datanode_url := "https://" + *config.datanode + ":3110/api/v1/import/docker?apikey=" + *config.apikey + "&data_source=docker"
+        glog.V(2).Info("URL " + datanode_url)
+        dnURL, err := url.Parse(datanode_url)
 
         if err != nil {
                 glog.Fatal(err)
