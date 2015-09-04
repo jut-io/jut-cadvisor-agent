@@ -292,7 +292,7 @@ func main() {
         flag.StringVar(&config.CadvisorUrl, "cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
         flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")
         flag.BoolVar(&config.AllowInsecureSsl, "allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
-        flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect full set of metrics from containers")
+        flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect and transmit full set of metrics from containers")
 
         flag.Parse()
 
