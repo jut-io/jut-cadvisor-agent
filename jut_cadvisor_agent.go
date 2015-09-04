@@ -10,8 +10,8 @@
 // - DONE Start sending to raw connector
 // - DONE Add command line arg parsing
 // - DONE Add support for "minimal" metrics
-// - Fill in README.md
-// - make repository public
+// - DONE Fill in README.md
+// - DONE make repository public
 // - Create docker hub account, get it built and downloadable there
 // - Write docker integration confluence page.
 // - Add support for fetching logs
