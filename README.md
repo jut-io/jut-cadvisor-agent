@@ -17,7 +17,7 @@ The full set of command line arguments is:
 `cadvisor_url=http://127.0.0.1:8080` - cAdvisor Root URL.<br>
 `datanode=""` - Jut Data Node Hostname. Must be provided.<br>
 `allow_insecure_ssl=false` - Allow insecure certificates when connecting to Jut Data Node.<br>
-`alsologtostderr=false` - log to standard error as well as files. Default false.<br>
+`alsologtostderr=false` - log to standard error as well as files.<br>
 `full_metrics=false` - Collect and report full set of metrics from containers.<br>
 `log_backtrace_at=:0:` - when logging hits line file:N, emit a stack trace.<br>
 `log_dir=""` - If non-empty, write log files in this directory.<br>
