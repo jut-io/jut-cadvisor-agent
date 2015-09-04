@@ -16,6 +16,7 @@ The full set of command line arguments is:
 `apikey=""` - Jut Data Engine API Key. Must be provided.<br>
 `cadvisor_url=http://127.0.0.1:8080` - cAdvisor Root URL.<br>
 `datanode=""` - Jut Data Node Hostname. Must be provided.<br>
+`poll_interval=30` - How often to poll containers (seconds).<br>
 `allow_insecure_ssl=false` - Allow insecure certificates when connecting to Jut Data Node.<br>
 `alsologtostderr=false` - log to standard error as well as files.<br>
 `full_metrics=false` - Collect and report full set of metrics from containers.<br>

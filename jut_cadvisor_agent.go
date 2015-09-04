@@ -12,13 +12,23 @@
 // - DONE Add support for "minimal" metrics
 // - DONE Fill in README.md
 // - DONE make repository public
-// - Create docker hub account, get it built and downloadable there
+// - DONE Create docker hub account, get it downloadable there
+// - DONE (handled that via godeps, to at least fix the version) change build to not just pull master of all github modules
+// - DONE Add an argument for polling interval
+// - Create some sample graphs:
+//     - stacked cpu usage for all containers
+//     - pie chart of cpu usage
+//     - stacked memory usage for all containers
+//     - pie chart of memory usage
+//     - capacity management
+//     - stacked network activity for all containers
+//     - pie chart of network activity
+// - Get automated builds working for docker hub account
 // - Write docker integration confluence page.
 // - Add support for fetching logs
 // - Test for filesystem, network iface, stats that don't show up by default
 // - Performance test
 // - Report metrics when the script itself is having problems
-// - change build to not just pull master of all github modules
 // - decide whether or not to grab non-metrics stuff like configuraton, etc.
 
 package main
@@ -44,6 +54,7 @@ type Config struct {
         Datanode string
         AllowInsecureSsl bool
         FullMetrics bool
+        PollInterval uint
 }
 
 var config Config
@@ -293,6 +304,7 @@ func main() {
         flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")
         flag.BoolVar(&config.AllowInsecureSsl, "allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
         flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect and transmit full set of metrics from containers")
+        flag.UintVar(&config.PollInterval, "poll_interval", 30, "Polling Interval (seconds)")
 
         flag.Parse()
 
@@ -316,6 +328,6 @@ func main() {
 
         for true {
                 collectMetrics(cURL, dnURL)
-                time.Sleep(30 * time.Second)
+                time.Sleep(time.Duration(config.PollInterval) * time.Second)
         }
 }
