@@ -16,13 +16,13 @@
 // - DONE (handled that via godeps, to at least fix the version) change build to not just pull master of all github modules
 // - DONE Add an argument for polling interval
 // - Create some sample graphs:
-//     - stacked cpu usage for all containers
-//     - pie chart of cpu usage
-//     - stacked memory usage for all containers
-//     - pie chart of memory usage
-//     - capacity management
-//     - stacked network activity for all containers
+//     - DONE stacked cpu usage for all containers
+//     - DONE pie chart of cpu usage
+//     - DONE stacked memory usage for all containers
+//     - DONE pie chart of memory usage
+//     - stacked network activity for all containers (blocked on a new cadvisor release)
 //     - pie chart of network activity
+//     - capacity management
 // - Get automated builds working for docker hub account
 // - Write docker integration confluence page.
 // - Add support for fetching logs
