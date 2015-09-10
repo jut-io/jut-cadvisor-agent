@@ -247,7 +247,7 @@ func ageContainerAlias() {
 
         for name, info := range containerAliases.Aliases {
                 // Age out entries older than 1 hour
-                if (time.Since(info.LastSeen).Seconds() > 3600) {
+                if time.Since(info.LastSeen).Seconds() > 3600 {
                         glog.V(4).Infof("Aging map: " + name + " -> " + info.ContainerAlias)
                         dels = append(dels, name)
                 }
@@ -281,7 +281,7 @@ func sendDataPoints(dataPoints DataPointList, dnURL *url.URL) {
 
         resp, err := dataNodeClient.Post(dnURL.String(),
                 "application/json",
-                bytes.NewBuffer(jsonDataPoints))
+                bytes.NewReader(jsonDataPoints))
 
         if err != nil {
                 glog.Errorf("Unable to send metrics to Jut Data Node: %v", err)
@@ -311,7 +311,7 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
                 &DataPoint{*hdr, "cpu.load_average", uint64(stat.Cpu.LoadAverage)},
         )
 
-        if (config.FullMetrics) {
+        if config.FullMetrics {
                 for idx, perCpuInfo := range stat.Cpu.Usage.PerCpu {
                         dataPoints = append(dataPoints, &PerCpuDataPoint{DataPoint{*hdr, "cpu.usage.per-cpu", perCpuInfo}, uint(idx)})
                 }
@@ -331,20 +331,20 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
                 &DataPoint{*hdr, "memory.working_set", stat.Memory.WorkingSet},
         )
 
-        if (config.FullMetrics) {
+        if config.FullMetrics {
                 dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.ContainerData, "memory.container_data")...)
                 dataPoints = append(dataPoints, addMemoryDataPoints(hdr, stat.Memory.HierarchicalData, "memory.hierarchical_data")...)
         }
 
         dataPoints = append(dataPoints, addIfaceDataPoints(hdr, stat.Network.InterfaceStats, "stat.network")...)
 
-        if (config.FullMetrics) {
+        if config.FullMetrics {
                 for _, ifaceStat := range stat.Network.Interfaces {
                         dataPoints = append(dataPoints, addIfaceDataPoints(hdr, ifaceStat, "stat.network")...)
                 }
         }
 
-        if (config.FullMetrics) {
+        if config.FullMetrics {
                 for _, fsStat := range stat.Filesystem {
                         dataPoints = append(dataPoints, addFilesystemDataPoints(hdr, fsStat, "stat.fs")...)
                 }
@@ -365,7 +365,7 @@ func collectMetrics(cURL *url.URL, dnURL *url.URL, sendToDataNode bool) {
 
         cAdvisorClient, err := client.NewClient(cURL.String())
         if err != nil {
-                glog.Errorf("tried to make cAdvisor client and got error: %v", err);
+                glog.Errorf("tried to make cAdvisor client and got error: %v", err)
                 return
         }
 
@@ -384,12 +384,12 @@ func collectMetrics(cURL *url.URL, dnURL *url.URL, sendToDataNode bool) {
 
         for _, info := range cInfos {
                 updateContainerAlias(info.Name, info.Aliases[0])
-                if (sendToDataNode) {
+                if sendToDataNode {
                         dataPoints = append(dataPoints, allDataPoints(info)...)
                 }
         }
 
-        if (sendToDataNode) {
+        if sendToDataNode {
                 glog.Info("Collecting Metrics")
                 sendDataPoints(dataPoints, dnURL)
         }
@@ -432,7 +432,7 @@ func collectEvents(cURL *url.URL, dnURL *url.URL, start time.Time, end time.Time
 func checkNonEmpty(arg string, argName string) {
         if arg == "" {
                 os.Stderr.WriteString("Argument " + argName + " must be provided. Usage:\n")
-                flag.PrintDefaults();
+                flag.PrintDefaults()
                 os.Exit(1)
         }
 }
@@ -444,8 +444,8 @@ func main() {
         flag.StringVar(&config.CadvisorUrl, "cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
         flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")
         flag.BoolVar(&config.AllowInsecureSsl, "allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
-        flag.BoolVar(&config.CollectMetrics, "metrics", true, "Collect Metrics from cAdvisor and set to Data Node");
-        flag.BoolVar(&config.CollectEvents, "events", true, "Collect Events from cAdvisor and set to Data Node");
+        flag.BoolVar(&config.CollectMetrics, "metrics", true, "Collect Metrics from cAdvisor and set to Data Node")
+        flag.BoolVar(&config.CollectEvents, "events", true, "Collect Events from cAdvisor and set to Data Node")
         flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect and transmit full set of metrics from containers")
         flag.UintVar(&config.PollInterval, "poll_interval", 30, "Polling Interval (seconds)")
 
@@ -461,7 +461,7 @@ func main() {
                 glog.Fatal(err)
         }
 
-        urlstr := "https://" + config.Datanode + ":3110/api/v1/import/docker?apikey=" + config.Apikey + "&data_source=docker";
+        urlstr := "https://" + config.Datanode + ":3110/api/v1/import/docker?apikey=" + config.Apikey + "&data_source=docker"
         glog.V(2).Info("Full data node url: " + urlstr)
         dnURL, err := url.Parse(urlstr)
 
@@ -487,7 +487,7 @@ func main() {
                         ageContainerAlias()
                 }
         }()
-        if (config.CollectEvents) {
+        if config.CollectEvents {
                 wg.Add(1)
                 go func() {
                         defer wg.Done()
