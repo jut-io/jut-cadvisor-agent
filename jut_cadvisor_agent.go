@@ -15,6 +15,8 @@
 // - DONE Create docker hub account, get it downloadable there
 // - DONE (handled that via godeps, to at least fix the version) change build to not just pull master of all github modules
 // - DONE Add an argument for polling interval
+// - DONE Write docker integration confluence page.
+// - DONE Properly report events about container creation/deletion
 // - Create some sample graphs:
 //     - DONE stacked cpu usage for all containers
 //     - DONE pie chart of cpu usage
@@ -24,7 +26,6 @@
 //     - pie chart of network activity
 //     - capacity management
 // - Get automated builds working for docker hub account
-// - Write docker integration confluence page.
 // - Add support for fetching logs
 // - Test for filesystem, network iface, stats that don't show up by default
 // - Performance test
@@ -38,6 +39,7 @@ import (
         "flag"
         "time"
         "bytes"
+        "sync"
         "net/http"
         "net/url"
         "encoding/json"
@@ -53,11 +55,27 @@ type Config struct {
         CadvisorUrl string
         Datanode string
         AllowInsecureSsl bool
+        CollectMetrics bool
+        CollectEvents bool
         FullMetrics bool
         PollInterval uint
 }
 
 var config Config
+
+// LastSeen is used to age out entries that haven't been seen in a
+// while.
+type ContainerAliasInfo struct {
+        ContainerAlias string
+        LastSeen time.Time
+}
+
+type ContainerAliasMap struct {
+        sync.Mutex
+        Aliases map[string]ContainerAliasInfo
+}
+
+var containerAliases ContainerAliasMap
 
 type DataPointList []interface{}
 
@@ -72,6 +90,11 @@ type DataPoint struct {
         DataPointHeader
         Name string `json:"name"`
         Value uint64 `json:"value"`
+}
+
+type EventDataPoint struct {
+        DataPointHeader
+        EventType info.EventType `json:"event_type"`
 }
 
 type PerCpuDataPoint struct {
@@ -166,6 +189,113 @@ func addFilesystemDataPoints(hdr *DataPointHeader, fsStat info.FsStats, statPref
         return dataPoints
 }
 
+// Find the container alias corresponding to the full container
+// name. Alias information is not returned in the events API, so we
+// need to fetch it separately. Also, a container may have been
+// deleted, at which time it's no longer possible to fetch information
+// on it to get the container alias.
+//
+// This information is obtained during updateMetrics(), which either
+// just fetches container info or additionally creates data points and
+// sends them to the data node, depending on the value of
+// --metrics.
+//
+func updateContainerAlias(ContainerName string, ContainerAlias string) {
+        containerAliases.Lock()
+        defer containerAliases.Unlock()
+
+        if containerAliases.Aliases == nil {
+                containerAliases.Aliases = make(map[string]ContainerAliasInfo)
+        }
+
+        info := &ContainerAliasInfo{ContainerAlias, time.Now()}
+        glog.V(4).Infof("Adding map: " + ContainerName + " -> " + ContainerAlias)
+        containerAliases.Aliases[ContainerName] = *info
+}
+
+func getContainerAlias(cAdvisorClient *client.Client, ContainerName string) (string){
+        containerAliases.Lock()
+        defer containerAliases.Unlock()
+
+        if containerAliases.Aliases == nil {
+                containerAliases.Aliases = make(map[string]ContainerAliasInfo)
+        }
+
+        alias := containerAliases.Aliases[ContainerName].ContainerAlias
+
+        if alias == "" {
+                request := info.ContainerInfoRequest{
+                        NumStats: 1,
+                }
+                cInfo, err := cAdvisorClient.ContainerInfo(ContainerName, &request)
+                if err == nil {
+                        glog.V(4).Infof("Adding map during get: " + ContainerName + " -> " + cInfo.Aliases[0])
+                        info := &ContainerAliasInfo{cInfo.Aliases[0], time.Now()}
+                        containerAliases.Aliases[ContainerName] = *info
+                }
+                alias = containerAliases.Aliases[ContainerName].ContainerAlias
+        }
+
+        return alias
+}
+
+func ageContainerAlias() {
+        containerAliases.Lock()
+        defer containerAliases.Unlock()
+
+        var dels []string
+
+        for name, info := range containerAliases.Aliases {
+                // Age out entries older than 1 hour
+                if (time.Since(info.LastSeen).Seconds() > 3600) {
+                        glog.V(4).Infof("Aging map: " + name + " -> " + info.ContainerAlias)
+                        dels = append(dels, name)
+                }
+        }
+
+        for _, del := range dels {
+                delete(containerAliases.Aliases, del)
+        }
+}
+
+func sendDataPoints(dataPoints DataPointList, dnURL *url.URL) {
+
+        if len(dataPoints) == 0 {
+                return
+        }
+
+        jsonDataPoints, err := json.Marshal(dataPoints)
+
+        if err != nil {
+                glog.Errorf("Unable to construct JSON metrics: %v", err)
+                return
+        }
+
+        glog.V(3).Infof("About to send: %v", string(jsonDataPoints))
+
+        tr := &http.Transport{
+                TLSClientConfig: &tls.Config{InsecureSkipVerify: config.AllowInsecureSsl},
+        }
+
+        dataNodeClient := &http.Client{Transport: tr}
+
+        resp, err := dataNodeClient.Post(dnURL.String(),
+                "application/json",
+                bytes.NewBuffer(jsonDataPoints))
+
+        if err != nil {
+                glog.Errorf("Unable to send metrics to Jut Data Node: %v", err)
+                return
+        }
+        defer resp.Body.Close()
+
+        if resp.StatusCode != 200 {
+                glog.Errorf("Unable to send metrics to Jut Data Node: %v", resp.Status)
+                return
+        }
+}
+
+
 func allDataPoints(info info.ContainerInfo) DataPointList {
 
         stat := info.Stats[0]
@@ -231,9 +361,7 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
 }
 
 
-func collectMetrics(cURL *url.URL, dnURL *url.URL) {
-
-        glog.Info("Collecting Metrics")
+func collectMetrics(cURL *url.URL, dnURL *url.URL, sendToDataNode bool) {
 
         cAdvisorClient, err := client.NewClient(cURL.String())
         if err != nil {
@@ -255,38 +383,51 @@ func collectMetrics(cURL *url.URL, dnURL *url.URL) {
         var dataPoints DataPointList
 
         for _, info := range cInfos {
-                dataPoints = append(dataPoints, allDataPoints(info)...)
-        }
-        jsonDataPoints, err := json.Marshal(dataPoints)
-
-        if err != nil {
-                glog.Errorf("Unable to construct JSON metrics: %v", err)
-                return
+                updateContainerAlias(info.Name, info.Aliases[0])
+                if (sendToDataNode) {
+                        dataPoints = append(dataPoints, allDataPoints(info)...)
+                }
         }
 
-        glog.V(3).Infof("About to send metrics: %v", string(jsonDataPoints))
-
-        tr := &http.Transport{
-                TLSClientConfig: &tls.Config{InsecureSkipVerify: config.AllowInsecureSsl},
-        }
-
-        dataNodeClient := &http.Client{Transport: tr}
-
-        resp, err := dataNodeClient.Post(dnURL.String(),
-                "application/json",
-                bytes.NewBuffer(jsonDataPoints))
-
-        if err != nil {
-                glog.Errorf("Unable to send metrics to Jut Data Node: %v", err)
-                return
-        }
-        defer resp.Body.Close()
-
-        if resp.StatusCode != 200 {
-                glog.Errorf("Unable to send metrics to Jut Data Node: %v", resp.Status)
-                return
+        if (sendToDataNode) {
+                glog.Info("Collecting Metrics")
+                sendDataPoints(dataPoints, dnURL)
         }
 }
+
+func collectEvents(cURL *url.URL, dnURL *url.URL, start time.Time, end time.Time) {
+
+        cAdvisorClient, err := client.NewClient("http://localhost:8080/")
+        if err != nil {
+                glog.Errorf("tried to make client and got error %v", err)
+                return
+        }
+        params := "?all_events=true&subcontainers=true&start_time=" + start.Format(time.RFC3339) + "&end_time=" + end.Format(time.RFC3339)
+        einfo, err := cAdvisorClient.EventStaticInfo(params)
+        if err != nil {
+                glog.Errorf("got error retrieving event info: %v", err)
+                return
+        }
+
+        var dataPoints DataPointList
+
+        // The json returned by the metrics is almost in the proper format. We just need to:
+        //     add the container alias
+        //     rename "timestamp" to "time"
+        //     remove "event_data"
+        //     add source_type: event
+
+        for idx, ev := range einfo {
+                glog.V(3).Infof("static einfo %v: %v", idx, ev)
+                hdr := &DataPointHeader{ev.Timestamp, ev.ContainerName, getContainerAlias(cAdvisorClient, ev.ContainerName), "event"}
+                dataPoints = append(dataPoints,
+                        &EventDataPoint{*hdr, ev.EventType},
+                )
+        }
+
+        sendDataPoints(dataPoints, dnURL)
+}
+
 
 func checkNonEmpty(arg string, argName string) {
         if arg == "" {
@@ -303,6 +444,8 @@ func main() {
         flag.StringVar(&config.CadvisorUrl, "cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
         flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")
         flag.BoolVar(&config.AllowInsecureSsl, "allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
+        flag.BoolVar(&config.CollectMetrics, "metrics", true, "Collect Metrics from cAdvisor and set to Data Node");
+        flag.BoolVar(&config.CollectEvents, "events", true, "Collect Events from cAdvisor and set to Data Node");
         flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect and transmit full set of metrics from containers")
         flag.UintVar(&config.PollInterval, "poll_interval", 30, "Polling Interval (seconds)")
 
@@ -326,8 +469,37 @@ func main() {
                 glog.Fatal(err)
         }
 
-        for true {
-                collectMetrics(cURL, dnURL)
-                time.Sleep(time.Duration(config.PollInterval) * time.Second)
+        var wg sync.WaitGroup
+        wg.Add(1)
+        go func() {
+                defer wg.Done()
+                for true {
+
+                        // Note we always call collectMetrics, which
+                        // has the side effect of maintaining mappings
+                        // between container names and alises. Whether
+                        // we actually turn the container info into
+                        // data points and send them is controlled by
+                        // the third argument, which is effectively
+                        // CollectMetrics.
+                        collectMetrics(cURL, dnURL, config.CollectMetrics)
+                        time.Sleep(time.Duration(config.PollInterval) * time.Second)
+                        ageContainerAlias()
+                }
+        }()
+        if (config.CollectEvents) {
+                wg.Add(1)
+                go func() {
+                        defer wg.Done()
+                        start := time.Now()
+                        for true {
+                                end := time.Now()
+                                collectEvents(cURL, dnURL, start, end)
+                                start = end
+                                time.Sleep(time.Duration(config.PollInterval) * time.Second)
+                        }
+                }()
         }
+
+        wg.Wait()
 }

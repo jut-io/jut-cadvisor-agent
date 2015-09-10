@@ -19,6 +19,8 @@ The full set of command line arguments is:
 `poll_interval=30` - How often to poll containers (seconds).<br>
 `allow_insecure_ssl=false` - Allow insecure certificates when connecting to Jut Data Node.<br>
 `alsologtostderr=false` - log to standard error as well as files.<br>
+`metrics=true` - Collect Metrics from cAdvisor and send to Data Node.<br>
+`events=true` - Collect Events from cAdvisor and send to Data Node.<br>
 `full_metrics=false` - Collect and report full set of metrics from containers.<br>
 `log_backtrace_at=:0:` - when logging hits line file:N, emit a stack trace.<br>
 `log_dir=""` - If non-empty, write log files in this directory.<br>
