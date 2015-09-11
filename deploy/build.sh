@@ -7,4 +7,4 @@ set -x
 
 godep go build -a github.com/jut-io/jut-cadvisor-agent
 
-sudo docker build -t jut/jut-cadvisor-agent:latest .
+sudo docker build -t jutd/jut-cadvisor-agent:latest .
