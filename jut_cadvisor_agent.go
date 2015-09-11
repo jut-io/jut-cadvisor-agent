@@ -94,7 +94,8 @@ type DataPoint struct {
 
 type EventDataPoint struct {
         DataPointHeader
-        EventType info.EventType `json:"event_type"`
+        EventType string `json:"event_type"`
+        ContainerEvent info.EventType `json:"container_event"`
 }
 
 type PerCpuDataPoint struct {
@@ -421,7 +422,7 @@ func collectEvents(cURL *url.URL, dnURL *url.URL, start time.Time, end time.Time
                 glog.V(3).Infof("static einfo %v: %v", idx, ev)
                 hdr := &DataPointHeader{ev.Timestamp, ev.ContainerName, getContainerAlias(cAdvisorClient, ev.ContainerName), "event"}
                 dataPoints = append(dataPoints,
-                        &EventDataPoint{*hdr, ev.EventType},
+                        &EventDataPoint{*hdr, "container_event", ev.EventType},
                 )
         }
 
