@@ -31,7 +31,7 @@ The full set of command line arguments is:
 
 jut-cadvisor-agent can (soon, not yet) also be run from Docker Hub:
 
-      docker run jut/jut-cadvisor-agent:latest
+      docker run jutd/jut-cadvisor-agent:latest
 
 Metrics Collected
 -----------------
