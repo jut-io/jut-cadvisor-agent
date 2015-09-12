@@ -9,7 +9,12 @@ Usage
 -----
 jut-cadvisor-agent is typically run as follows:
 
-      jut-cadvisor-agent --apikey=XXXXXX --datanode=data-engine-192-168-37-12.jutdata.io
+     jut-cadvisor-agent --apikey=<apikey> --datanode=<jut data node hostname>
+
+*apikey* is a string specific to your deployment. The *jut data node
+ hostname* is a hostname of the form
+ `data-engine-192-168-37-12.jutdata.io`.
+
 
 The full set of command line arguments is:
 
@@ -29,9 +34,14 @@ The full set of command line arguments is:
 `v=0` - log level for V logs.<br>
 `vmodule` - comma-separated list of pattern=N settings for file-filtered logging.<br>
 
-jut-cadvisor-agent can (soon, not yet) also be run from Docker Hub:
+jut-cadvisor-agent can also be run from Docker Hub. Assuming you have
+cAdvisor running in a container named "cadvisor", this `docker run`
+command will start jut-cadvisor-agent to poll cAdvisor and send
+metrics/events to your jut Data Node:
 
-      docker run jutd/jut-cadvisor-agent:latest
+     docker run --detach=true --name jut-cadvisor-agent \
+     --net=container:cadvisor jutd/jut-cadvisor-agent:latest \
+     --apikey=<apikey> --datanode=<jut data node hostname>
 
 Metrics Collected
 -----------------
