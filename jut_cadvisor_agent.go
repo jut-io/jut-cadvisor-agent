@@ -86,8 +86,16 @@ type DataPointHeader struct {
         SourceType string `json:"source_type"`
 }
 
+type MetricType string
+
+const (
+        MetricCounter    MetricType = "counter"
+        MetricGauge                 = "gauge"
+)
+
 type DataPoint struct {
         DataPointHeader
+        MetricType MetricType `json:"metric_type"`
         Name string `json:"name"`
         Value uint64 `json:"value"`
 }
@@ -128,6 +136,7 @@ func addPerDiskDataPoints(hdr *DataPointHeader, perDiskInfos []info.PerDiskStats
                 for _, metric := range metrics {
                         dataPoints = append(dataPoints,
                                 &PerDiskDataPoint{DataPoint{*hdr,
+                                        MetricCounter,
                                         statPrefix + "." + metric,
                                         perDiskInfo.Stats[metric]},
                                         perDiskInfo.Major,
@@ -143,14 +152,14 @@ func addIfaceDataPoints(hdr *DataPointHeader, ifaceStat info.InterfaceStats, sta
         var dataPoints DataPointList
 
         dataPoints = append(dataPoints,
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_bytes", ifaceStat.RxBytes}, ifaceStat.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_packets", ifaceStat.RxPackets}, ifaceStat.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_errors", ifaceStat.RxErrors}, ifaceStat.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".rx_dropped", ifaceStat.RxDropped}, ifaceStat.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_bytes", ifaceStat.TxBytes}, ifaceStat.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_packets", ifaceStat.TxPackets}, ifaceStat.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_errors", ifaceStat.TxErrors}, ifaceStat.Name},
-                &PerIfaceDataPoint{DataPoint{*hdr, statPrefix + ".tx_dropped", ifaceStat.TxDropped}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".rx_bytes", ifaceStat.RxBytes}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".rx_packets", ifaceStat.RxPackets}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".rx_errors", ifaceStat.RxErrors}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".rx_dropped", ifaceStat.RxDropped}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".tx_bytes", ifaceStat.TxBytes}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".tx_packets", ifaceStat.TxPackets}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".tx_errors", ifaceStat.TxErrors}, ifaceStat.Name},
+                &PerIfaceDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".tx_dropped", ifaceStat.TxDropped}, ifaceStat.Name},
         )
 
         return dataPoints
@@ -160,8 +169,8 @@ func addMemoryDataPoints(hdr *DataPointHeader, memData info.MemoryStatsMemoryDat
 
         var dataPoints DataPointList
 
-        dataPoints = append(dataPoints, &DataPoint{*hdr, statPrefix + "." + "pgfault", memData.Pgfault})
-        dataPoints = append(dataPoints, &DataPoint{*hdr, statPrefix + "." + "pgmajfault", memData.Pgmajfault})
+        dataPoints = append(dataPoints, &DataPoint{*hdr, MetricCounter, statPrefix + "." + "pgfault", memData.Pgfault})
+        dataPoints = append(dataPoints, &DataPoint{*hdr, MetricCounter, statPrefix + "." + "pgmajfault", memData.Pgmajfault})
 
         return dataPoints
 }
@@ -171,20 +180,20 @@ func addFilesystemDataPoints(hdr *DataPointHeader, fsStat info.FsStats, statPref
         var dataPoints DataPointList
 
         dataPoints = append(dataPoints,
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".capacity", fsStat.Limit}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".usage", fsStat.Usage}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".available", fsStat.Available}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".reads_completed", fsStat.ReadsCompleted}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".reads_merged", fsStat.ReadsMerged}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".sectors_read", fsStat.SectorsRead}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".read_time", fsStat.ReadTime}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".writes_completed", fsStat.WritesCompleted}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".writes_merged", fsStat.WritesMerged}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".sectors_written", fsStat.SectorsWritten}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".write_time", fsStat.WriteTime}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".io_in_progress", fsStat.IoInProgress}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".io_time", fsStat.IoTime}, fsStat.Device},
-                &PerFilesystemDataPoint{DataPoint{*hdr, statPrefix + ".weighted_io_time", fsStat.WeightedIoTime}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricGauge, statPrefix + ".capacity", fsStat.Limit}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricGauge, statPrefix + ".usage", fsStat.Usage}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricGauge, statPrefix + ".available", fsStat.Available}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".reads_completed", fsStat.ReadsCompleted}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".reads_merged", fsStat.ReadsMerged}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".sectors_read", fsStat.SectorsRead}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".read_time", fsStat.ReadTime}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".writes_completed", fsStat.WritesCompleted}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".writes_merged", fsStat.WritesMerged}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".sectors_written", fsStat.SectorsWritten}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".write_time", fsStat.WriteTime}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricGauge, statPrefix + ".io_in_progress", fsStat.IoInProgress}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".io_time", fsStat.IoTime}, fsStat.Device},
+                &PerFilesystemDataPoint{DataPoint{*hdr, MetricCounter, statPrefix + ".weighted_io_time", fsStat.WeightedIoTime}, fsStat.Device},
         )
 
         return dataPoints
@@ -306,15 +315,15 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
         hdr := &DataPointHeader{stat.Timestamp, info.Name, info.Aliases[0], "metric"}
 
         dataPoints = append(dataPoints,
-                &DataPoint{*hdr, "cpu.usage.total", stat.Cpu.Usage.Total},
-                &DataPoint{*hdr, "cpu.usage.user", stat.Cpu.Usage.User},
-                &DataPoint{*hdr, "cpu.usage.system", stat.Cpu.Usage.System},
-                &DataPoint{*hdr, "cpu.load_average", uint64(stat.Cpu.LoadAverage)},
+                &DataPoint{*hdr, MetricCounter, "cpu.usage.total", stat.Cpu.Usage.Total},
+                &DataPoint{*hdr, MetricCounter, "cpu.usage.user", stat.Cpu.Usage.User},
+                &DataPoint{*hdr, MetricCounter, "cpu.usage.system", stat.Cpu.Usage.System},
+                &DataPoint{*hdr, MetricGauge, "cpu.load_average", uint64(stat.Cpu.LoadAverage)},
         )
 
         if config.FullMetrics {
                 for idx, perCpuInfo := range stat.Cpu.Usage.PerCpu {
-                        dataPoints = append(dataPoints, &PerCpuDataPoint{DataPoint{*hdr, "cpu.usage.per-cpu", perCpuInfo}, uint(idx)})
+                        dataPoints = append(dataPoints, &PerCpuDataPoint{DataPoint{*hdr, MetricCounter, "cpu.usage.per-cpu", perCpuInfo}, uint(idx)})
                 }
 
                 dataPoints = append(dataPoints, addPerDiskDataPoints(hdr, stat.DiskIo.IoServiceBytes, "diskio.io_service_bytes")...)
@@ -328,8 +337,8 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
         }
 
         dataPoints = append(dataPoints,
-                &DataPoint{*hdr, "memory.usage", stat.Memory.Usage},
-                &DataPoint{*hdr, "memory.working_set", stat.Memory.WorkingSet},
+                &DataPoint{*hdr, MetricGauge, "memory.usage", stat.Memory.Usage},
+                &DataPoint{*hdr, MetricGauge, "memory.working_set", stat.Memory.WorkingSet},
         )
 
         if config.FullMetrics {
@@ -351,11 +360,11 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
                 }
 
                 dataPoints = append(dataPoints,
-                        &DataPoint{*hdr, "task.nr_sleeping", stat.TaskStats.NrSleeping},
-                        &DataPoint{*hdr, "task.nr_running", stat.TaskStats.NrRunning},
-                        &DataPoint{*hdr, "task.nr_stopped", stat.TaskStats.NrStopped},
-                        &DataPoint{*hdr, "task.nr_uninterruptible", stat.TaskStats.NrUninterruptible},
-                        &DataPoint{*hdr, "task.nr_io_wait", stat.TaskStats.NrIoWait},
+                        &DataPoint{*hdr, MetricGauge, "task.nr_sleeping", stat.TaskStats.NrSleeping},
+                        &DataPoint{*hdr, MetricGauge, "task.nr_running", stat.TaskStats.NrRunning},
+                        &DataPoint{*hdr, MetricGauge, "task.nr_stopped", stat.TaskStats.NrStopped},
+                        &DataPoint{*hdr, MetricGauge, "task.nr_uninterruptible", stat.TaskStats.NrUninterruptible},
+                        &DataPoint{*hdr, MetricGauge, "task.nr_io_wait", stat.TaskStats.NrIoWait},
                 )
         }
         return dataPoints
