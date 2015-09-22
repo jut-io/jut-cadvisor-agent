@@ -26,7 +26,6 @@
 //     - pie chart of network activity
 //     - capacity management
 // - Get automated builds working for docker hub account
-// - Add support for fetching logs
 // - Test for filesystem, network iface, stats that don't show up by default
 // - Performance test
 // - Report metrics when the script itself is having problems
@@ -199,6 +198,17 @@ func addFilesystemDataPoints(hdr *DataPointHeader, fsStat info.FsStats, statPref
         return dataPoints
 }
 
+// Not expected to happen, but safeguards against the Aliases array
+// being empty.
+func getAliasSafely(Aliases []string) (string) {
+        if len(Aliases) == 0 {
+               return "Unknown Alias"
+        } else {
+                return Aliases[0]
+        }
+}
+
+
 // Find the container alias corresponding to the full container
 // name. Alias information is not returned in the events API, so we
 // need to fetch it separately. Also, a container may have been
@@ -239,8 +249,9 @@ func getContainerAlias(cAdvisorClient *client.Client, ContainerName string) (str
                 }
                 cInfo, err := cAdvisorClient.ContainerInfo(ContainerName, &request)
                 if err == nil {
-                        glog.V(4).Infof("Adding map during get: " + ContainerName + " -> " + cInfo.Aliases[0])
-                        info := &ContainerAliasInfo{cInfo.Aliases[0], time.Now()}
+                        alias := getAliasSafely(cInfo.Aliases)
+                        glog.V(4).Infof("Adding map during get: " + ContainerName + " -> " + alias)
+                        info := &ContainerAliasInfo{alias, time.Now()}
                         containerAliases.Aliases[ContainerName] = *info
                 }
                 alias = containerAliases.Aliases[ContainerName].ContainerAlias
@@ -312,7 +323,7 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
 
         var dataPoints DataPointList
 
-        hdr := &DataPointHeader{stat.Timestamp, info.Name, info.Aliases[0], "metric"}
+        hdr := &DataPointHeader{stat.Timestamp, info.Name, getAliasSafely(info.Aliases), "metric"}
 
         dataPoints = append(dataPoints,
                 &DataPoint{*hdr, MetricCounter, "cpu.usage.total", stat.Cpu.Usage.Total},
@@ -393,7 +404,7 @@ func collectMetrics(cURL *url.URL, dnURL *url.URL, sendToDataNode bool) {
         var dataPoints DataPointList
 
         for _, info := range cInfos {
-                updateContainerAlias(info.Name, info.Aliases[0])
+                updateContainerAlias(info.Name, getAliasSafely(info.Aliases))
                 if sendToDataNode {
                         dataPoints = append(dataPoints, allDataPoints(info)...)
                 }
