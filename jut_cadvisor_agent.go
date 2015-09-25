@@ -53,6 +53,8 @@ type Config struct {
 	Apikey           string
 	CadvisorUrl      string
 	Datanode         string
+	DataSource       string
+	Space            string
 	AllowInsecureSsl bool
 	CollectMetrics   bool
 	CollectEvents    bool
@@ -83,6 +85,7 @@ type DataPointHeader struct {
 	ContainerName  string    `json:"container_name"`
 	ContainerAlias string    `json:"container_alias"`
 	SourceType     string    `json:"source_type"`
+	DataSource     string    `json:"data_source"`
 }
 
 type MetricType string
@@ -321,7 +324,7 @@ func allDataPoints(info info.ContainerInfo) DataPointList {
 
 	var dataPoints DataPointList
 
-	hdr := &DataPointHeader{stat.Timestamp, info.Name, getAliasSafely(info.Aliases), "metric"}
+	hdr := &DataPointHeader{stat.Timestamp, info.Name, getAliasSafely(info.Aliases), "metric", config.DataSource}
 
 	dataPoints = append(dataPoints,
 		&DataPoint{*hdr, MetricCounter, "cpu.usage.total", stat.Cpu.Usage.Total},
@@ -437,7 +440,7 @@ func collectEvents(cURL *url.URL, dnURL *url.URL, start time.Time, end time.Time
 
 	for idx, ev := range einfo {
 		glog.V(3).Infof("static einfo %v: %v", idx, ev)
-		hdr := &DataPointHeader{ev.Timestamp, ev.ContainerName, getContainerAlias(cAdvisorClient, ev.ContainerName), "event"}
+		hdr := &DataPointHeader{ev.Timestamp, ev.ContainerName, getContainerAlias(cAdvisorClient, ev.ContainerName), "event", config.DataSource}
 		dataPoints = append(dataPoints,
 			&EventDataPoint{*hdr, "container_event", ev.EventType},
 		)
@@ -459,11 +462,13 @@ func main() {
 	flag.StringVar(&config.Apikey, "apikey", "", "Jut Data Engine API Key")
 	flag.StringVar(&config.CadvisorUrl, "cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
 	flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")
+	flag.StringVar(&config.Space, "space", "default", "Jut Space to use for points")
+	flag.StringVar(&config.DataSource, "data_source", "docker", "Data Source to use for points")
 	flag.BoolVar(&config.AllowInsecureSsl, "allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
 	flag.BoolVar(&config.CollectMetrics, "metrics", true, "Collect Metrics from cAdvisor and set to Data Node")
 	flag.BoolVar(&config.CollectEvents, "events", true, "Collect Events from cAdvisor and set to Data Node")
 	flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect and transmit full set of metrics from containers")
-	flag.UintVar(&config.PollInterval, "poll_interval", 30, "Polling Interval (seconds)")
+	flag.UintVar(&config.PollInterval, "poll_interval", 10, "Polling Interval (seconds)")
 
 	flag.Parse()
 
@@ -477,7 +482,7 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	urlstr := "https://" + config.Datanode + ":3110/api/v1/import/docker?apikey=" + config.Apikey + "&data_source=docker"
+	urlstr := "https://" + config.Datanode + ":3110/api/v1/import/docker?apikey=" + config.Apikey + "&data_source=" + config.DataSource + "&space=" + config.Space
 	glog.V(2).Info("Full data node url: " + urlstr)
 	dnURL, err := url.Parse(urlstr)
 
