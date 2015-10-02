@@ -418,7 +418,7 @@ func collectMetrics(cURL *url.URL, dnURL *url.URL, sendToDataNode bool) {
 
 func collectEvents(cURL *url.URL, dnURL *url.URL, start time.Time, end time.Time) {
 
-	cAdvisorClient, err := client.NewClient("http://localhost:8080/")
+	cAdvisorClient, err := client.NewClient(cURL.String())
 	if err != nil {
 		glog.Errorf("tried to make client and got error %v", err)
 		return
