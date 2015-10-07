@@ -459,6 +459,8 @@ func checkNonEmpty(arg string, argName string) {
 
 func main() {
 
+	flag.Set("alsologtostderr", "true")
+
 	flag.StringVar(&config.Apikey, "apikey", "", "Jut Data Engine API Key")
 	flag.StringVar(&config.CadvisorUrl, "cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
 	flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")

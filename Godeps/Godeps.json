@@ -8,13 +8,13 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client",
-			"Comment": "0.16.0.2",
-			"Rev": "cefada41b87c35294533638733c563a349b95f05"
+			"Comment": "0.18.0-19-g8dcf46b",
+			"Rev": "8dcf46b1539958c2b984df08edfa04d21069bb01"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v1",
-			"Comment": "0.16.0.2",
-			"Rev": "cefada41b87c35294533638733c563a349b95f05"
+			"Comment": "0.18.0-19-g8dcf46b",
+			"Rev": "8dcf46b1539958c2b984df08edfa04d21069bb01"
 		}
 	]
 }
