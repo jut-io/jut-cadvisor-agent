@@ -22,9 +22,9 @@ The full set of command line arguments is:
 `cadvisor_url=http://127.0.0.1:8080` - cAdvisor Root URL.<br>
 `data_source="docker"` - Data Source to use for points.<br>
 `datanode=""` - Jut Data Node Hostname. Must be provided.<br>
-`poll_interval=30` - How often to poll containers (seconds).<br>
+`poll_interval=10` - How often to poll containers (seconds).<br>
 `allow_insecure_ssl=false` - Allow insecure certificates when connecting to Jut Data Node.<br>
-`alsologtostderr=false` - log to standard error as well as files.<br>
+`alsologtostderr=true` - log to standard error as well as files.<br>
 `metrics=true` - Collect Metrics from cAdvisor and send to Data Node.<br>
 `events=true` - Collect Events from cAdvisor and send to Data Node.<br>
 `full_metrics=false` - Collect and report full set of metrics from containers.<br>
