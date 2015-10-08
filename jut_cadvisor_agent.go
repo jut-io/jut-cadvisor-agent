@@ -41,6 +41,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -462,15 +463,69 @@ func main() {
 	flag.Set("alsologtostderr", "true")
 
 	flag.StringVar(&config.Apikey, "apikey", "", "Jut Data Engine API Key")
+    if os.Getenv("JUT_APIKEY") != "" {
+        config.Apikey = os.Getenv("JUT_APIKEY")
+    }
+
 	flag.StringVar(&config.CadvisorUrl, "cadvisor_url", "http://127.0.0.1:8080", "cAdvisor Root URL")
+    if os.Getenv("JUT_CADVISOR_URL") != "" {
+        config.CadvisorUrl = os.Getenv("JUT_CADVISOR_URL")
+    }
+
 	flag.StringVar(&config.Datanode, "datanode", "", "Jut Data Node Hostname")
+    if os.Getenv("JUT_DATANODE") != "" {
+        config.Datanode = os.Getenv("JUT_DATANODE")
+    }
+
 	flag.StringVar(&config.Space, "space", "default", "Jut Space to use for points")
+    if os.Getenv("JUT_SPACE") != "" {
+        config.Space = os.Getenv("JUT_SPACE")
+    }
+
 	flag.StringVar(&config.DataSource, "data_source", "docker", "Data Source to use for points")
+    if os.Getenv("JUT_DATASOURCE") != "" {
+        config.DataSource = os.Getenv("JUT_DATASOURCE")
+    }
+
 	flag.BoolVar(&config.AllowInsecureSsl, "allow_insecure_ssl", false, "Allow insecure certificates when connecting to Jut Data Node")
+    if os.Getenv("JUT_ALLOW_INSECURE_SSL") != "" {
+        val, err := strconv.ParseBool(os.Getenv("JUT_ALLOW_INSECURE_SSL"))
+        if err == nil {
+            config.AllowInsecureSsl = val
+        }
+    }
+
 	flag.BoolVar(&config.CollectMetrics, "metrics", true, "Collect Metrics from cAdvisor and set to Data Node")
+    if os.Getenv("JUT_METRICS") != "" {
+        val, err := strconv.ParseBool(os.Getenv("JUT_METRICS"))
+        if err == nil {
+            config.CollectMetrics = val
+        }
+    }
+
 	flag.BoolVar(&config.CollectEvents, "events", true, "Collect Events from cAdvisor and set to Data Node")
+    if os.Getenv("JUT_EVENTS") != "" {
+        val, err := strconv.ParseBool(os.Getenv("JUT_EVENTS"))
+        if err == nil {
+            config.CollectEvents = val
+        }
+    }
+
 	flag.BoolVar(&config.FullMetrics, "full_metrics", false, "Collect and transmit full set of metrics from containers")
+    if os.Getenv("JUT_FULL_METRICS") != "" {
+        val, err := strconv.ParseBool(os.Getenv("JUT_FULL_METRICS"))
+        if err == nil {
+            config.FullMetrics = val
+        }
+    }
+
 	flag.UintVar(&config.PollInterval, "poll_interval", 10, "Polling Interval (seconds)")
+    if os.Getenv("JUT_POLL_INTERVAL") != "" {
+        val, err := strconv.Atoi(os.Getenv("JUT_POLL_INTERVAL"))
+        if err == nil {
+            config.PollInterval = uint(val)
+        }
+    }
 
 	flag.Parse()
 
