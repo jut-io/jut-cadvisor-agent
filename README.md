@@ -3,7 +3,7 @@ jut-cadvisor-agent
 
 jut-cadvisor-agent is a companion program to [cAdvisor] (https://github.com/google/cadvisor), which monitors [Docker] (https://www.docker.com/) containers. It runs alongside cAdvisor, polling it for metrics/events, and sends those metrics/events to a Jut Data Node.
 
-For more information on Jut Data Nodes and how to use the metrics and events collected from Docket containers, please visit our [Web Site] (http://www.jut.io) or read our [Documentation] (http://docs.jut.io).
+For more information on Jut Data Nodes and how to use the metrics and events collected from Docker containers, please visit our [Web Site] (http://www.jut.io) or read our [Documentation] (http://docs.jut.io).
 
 Usage
 -----
